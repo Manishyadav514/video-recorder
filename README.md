@@ -1,36 +1,138 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Video Recorder in Next.js
 
-## Getting Started
+```markdown
+# Video Recorder Component
 
-First, run the development server:
+This is a React component built with Next.js and Tailwind CSS that allows users to record video and audio from their device. The recorded video is automatically downloaded when the recording is stopped.
+
+## Features
+
+- **Start/Stop Recording**: Toggle the recording on and off with a single button.
+- **Auto-Download**: The recorded video is automatically downloaded when the recording is stopped.
+- **Responsive Design**: Styled with Tailwind CSS for a sleek, responsive interface.
+
+## Installation
+
+To use this component in your Next.js project, follow these steps:
+
+### 1. Clone the repository
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/your-username/video-recorder-component.git
+cd video-recorder-component
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Add Tailwind CSS
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Added custom animation in tailwind  `tailwind.config.js`:
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+1. ```javascript
+   // tailwind.config.js
+   module.exports = {
+     content: [
+       './pages/**/*.{js,ts,jsx,tsx}',
+       './components/**/*.{js,ts,jsx,tsx}',
+     ],
+     theme: {
+       extend: {
+         keyframes: {
+           pulse: {
+             '0%': { boxShadow: '0px 0px 5px 0px rgba(173,0,0,.3)' },
+             '65%': { boxShadow: '0px 0px 5px 13px rgba(173,0,0,.3)' },
+             '90%': { boxShadow: '0px 0px 5px 13px rgba(173,0,0,0)' },
+           },
+         },
+         animation: {
+           pulse: 'pulse 1.5s linear infinite',
+         },
+       },
+     },
+     plugins: [],
+   };
+   ```
 
-## Learn More
+   Video recording component
 
-To learn more about Next.js, take a look at the following resources:
+```tsx
+import { useState, useRef } from 'react';
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+const VideoRecorder: React.FC = () => {
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const videoChunksRef = useRef<Blob[]>([]);
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+  const handleRecording = async () => {
+    if (isRecording) {
+      // Stop recording
+      mediaRecorderRef.current?.stop();
+      setIsRecording(false);
+    } else {
+      // Start recording
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
 
-## Deploy on Vercel
+      mediaRecorderRef.current = new MediaRecorder(stream, {
+        mimeType: 'video/webm',
+      });
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          videoChunksRef.current.push(event.data);
+        }
+      };
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(videoChunksRef.current, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+
+        // Automatically download the recorded video
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'recorded-video.webm';
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+
+        // Clear the video chunks
+        videoChunksRef.current = [];
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    }
+  };
+
+  return (
+    <button
+      id="recButton"
+      onClick={handleRecording}
+      className={`w-[35px] h-[35px] ${isRecording ? 'bg-red animate-pulse' : 'bg-darkred'} border-0 rounded-full m-4 outline-none cursor-pointer`}
+    />
+  );
+};
+
+export default VideoRecorder;
+```
+
+### 5. Usage
+
+To use the `RecordingButton` component in your application, import it and include it in your JSX:
+
+```tsx
+import VideoRecorder from '../components/VideoRecorder';
+
+export default function Home() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <VideoRecorder />
+    </div>
+  );
+}
+```
+
+### Change Download Format
+
+The component currently records and downloads the video in `video/webm` format. If you need a different format, you can modify the `mimeType` in the `MediaRecorder` configuration.
